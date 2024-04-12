@@ -389,7 +389,7 @@ def cacul_aupr(lables, pred):
 def Seq_train(learningrate, batchsize, train_benchmark, test_benchmark, epochtime, func='BP'):
     print('{}  seqmodel start'.format(func))
     seq_model = Seq_Module(func).cuda()
-    batch_size = 64  # You can reduce the batch size to a smaller value
+    batch_size = 16  # You can reduce the batch size to a smaller value
     #batch_size = batchsize
     learning_rate = learningrate
     epoch_times = epochtime
@@ -412,7 +412,7 @@ def Seq_train(learningrate, batchsize, train_benchmark, test_benchmark, epochtim
         batch_num = 0
         torch.cuda.empty_cache()  # Add this line to release GPU memory
         for batch_idx, (seqMatrix, domainStence, ppiVect, GO_annotiations) in enumerate(train_data_loader):
-            print(type(seqMatrix), type(domainStence), type(ppiVect), type(GO_annotiations))
+            #print(type(seqMatrix), type(domainStence), type(ppiVect), type(GO_annotiations))
             seqMatrix = Variable(seqMatrix).cuda()
             GO_annotiations = torch.squeeze(GO_annotiations)
             GO_annotiations = Variable(GO_annotiations.unsqueeze(1)).cuda()
@@ -502,7 +502,7 @@ def Seq_train(learningrate, batchsize, train_benchmark, test_benchmark, epochtim
         seq_test_outs[test_benchmark[batch_idx]] = out.data[0].cpu().tolist()
         pred.append(out.data[0].cpu().tolist())
         actual.append(GO_annotiations.data[0].cpu().tolist())
-       # print(f"Output shape: {out.shape}, Target shape: {GO_annotiations.shape}")
+        #print(f"Output shape: {out.shape}, Target shape: {GO_annotiations.shape}")
         loss = loss_function(out, GO_annotiations)
         t_loss += one_loss.item()
         #t_loss += loss.data[0]
@@ -553,7 +553,7 @@ def Seq_train(learningrate, batchsize, train_benchmark, test_benchmark, epochtim
 def Domain_train(learningrate, batchsize, train_benchmark, test_benchmark, epochtime, func='BP'):
     print('{}  domainmodel start'.format(func))
     domain_model = Domain_Module(func).cuda()
-    batch_size = 64 # You can reduce the batch size to a smaller value
+    batch_size = 16 # You can reduce the batch size to a smaller value
     #batch_size = batchsize
     learning_rate = learningrate
     epoch_times = epochtime
@@ -696,7 +696,7 @@ def Domain_train(learningrate, batchsize, train_benchmark, test_benchmark, epoch
 def PPI_train(learningrate, batchsize, train_benchmark, test_benchmark, epochtime, func='BP'):
     print('{}  PPImodel start'.format(func))
     ppi_model = PPI_Module(func).cuda()
-    batch_size = 64 # You can reduce the batch size to a smaller value
+    batch_size = 16 # You can reduce the batch size to a smaller value
     #batch_size = batchsize
     learning_rate = learningrate
     epoch_times = epochtime
@@ -799,7 +799,7 @@ def PPI_train(learningrate, batchsize, train_benchmark, test_benchmark, epochtim
         ppi_test_outs[test_benchmark[batch_idx]] = out.data[0].cpu().tolist()
         pred.append(out.data[0].cpu().tolist())
         actual.append(GO_annotiations.data[0].cpu().tolist())
-        print(f"Output shape: {out.shape}, Target shape: {GO_annotiations.shape}")
+        #print(f"Output shape: {out.shape}, Target shape: {GO_annotiations.shape}")
         loss = loss_function(out, GO_annotiations)
         t_loss += loss.item()
         #t_loss += loss.data[0]
@@ -848,17 +848,17 @@ def PPI_train(learningrate, batchsize, train_benchmark, test_benchmark, epochtim
 def Main(train_benchmark, test_benchmark, func='BP'):
     
     if func == 'BP':
-        seq_train_out, seq_test_out, seq_t = Seq_train(0.00001, 64, train_benchmark, test_benchmark, 100, func)  # 15
-        domain_train_out, domain_test_out, domain_t = Domain_train(0.00001, 64, train_benchmark, test_benchmark, 100,
+        seq_train_out, seq_test_out, seq_t = Seq_train(0.00001, 16, train_benchmark, test_benchmark, 100, func)  # 15
+        domain_train_out, domain_test_out, domain_t = Domain_train(0.00001, 16, train_benchmark, test_benchmark, 100,
                                                                        func)  # 40
     else:
-        seq_train_out, seq_test_out, seq_t = Seq_train(0.00001, 64, train_benchmark, test_benchmark, 100, func)    #15
-        domain_train_out, domain_test_out, domain_t = Domain_train(0.00001, 64, train_benchmark, test_benchmark, 100, func)  #40
-    ppi_train_out, ppi_test_out, ppi_t = PPI_train(0.00001, 64, train_benchmark, test_benchmark, 100, func)   #40
+        seq_train_out, seq_test_out, seq_t = Seq_train(0.00001, 16, train_benchmark, test_benchmark, 100, func)    #15
+        domain_train_out, domain_test_out, domain_t = Domain_train(0.00001, 16, train_benchmark, test_benchmark, 100, func)  #40
+    ppi_train_out, ppi_test_out, ppi_t = PPI_train(0.00001, 16, train_benchmark, test_benchmark, 100, func)   #40
 
     print('{}  Weight_model start'.format(func))
     learning_rate = 0.00001
-    batch_size = 64
+    batch_size = 16
     epoch_times = 100
     weight_model = Weight_classifier(func).cuda()
     print(weight_model)
@@ -982,7 +982,7 @@ def Main(train_benchmark, test_benchmark, func='BP'):
     plt.ylabel('Loss')
     plt.title('Training and Validation Losses')
     plt.legend(['Train Loss', 'Validation Loss'])  # Set legend labels directly
-    plt.savefig('myepoch64batch.png')  # Save the figure before clearing
+    plt.savefig('myepoch1001a.png')  # Save the figure before clearing
     plt.clf()  # Clear the current figure to start a new one
     plt.show()
     

@@ -20,6 +20,8 @@ from sklearn.metrics import roc_auc_score, roc_curve, auc, precision_score, reca
 from sklearn.model_selection import train_test_split
 from sklearn.model_selection import KFold
 from torch.nn import BCEWithLogitsLoss
+from sklearn.metrics import confusion_matrix, roc_curve, auc
+import seaborn as sns
 import matplotlib.pyplot as plt
 import os
 import time
@@ -89,7 +91,7 @@ class Dataload(Dataset):
                 prot, domains = items[0], items[1:]
                 domains = [int(x) for x in domains]
                 self.doamins[prot] = domains
-        ppi_file = 'ppi_matrixcomplete.csv'
+        ppi_file = 'selected_208964_protein_score.csv'
         print(ppi_file)
         with open(ppi_file, 'r') as f:
             num = 1
@@ -389,7 +391,7 @@ def cacul_aupr(lables, pred):
 def Seq_train(learningrate, batchsize, train_benchmark, test_benchmark, epochtime, func='BP'):
     print('{}  seqmodel start'.format(func))
     seq_model = Seq_Module(func).cuda()
-    batch_size = 64  # You can reduce the batch size to a smaller value
+    batch_size = 8  # You can reduce the batch size to a smaller value
     #batch_size = batchsize
     learning_rate = learningrate
     epoch_times = epochtime
@@ -412,7 +414,7 @@ def Seq_train(learningrate, batchsize, train_benchmark, test_benchmark, epochtim
         batch_num = 0
         torch.cuda.empty_cache()  # Add this line to release GPU memory
         for batch_idx, (seqMatrix, domainStence, ppiVect, GO_annotiations) in enumerate(train_data_loader):
-            print(type(seqMatrix), type(domainStence), type(ppiVect), type(GO_annotiations))
+           # print(type(seqMatrix), type(domainStence), type(ppiVect), type(GO_annotiations))
             seqMatrix = Variable(seqMatrix).cuda()
             GO_annotiations = torch.squeeze(GO_annotiations)
             GO_annotiations = Variable(GO_annotiations.unsqueeze(1)).cuda()
@@ -502,7 +504,7 @@ def Seq_train(learningrate, batchsize, train_benchmark, test_benchmark, epochtim
         seq_test_outs[test_benchmark[batch_idx]] = out.data[0].cpu().tolist()
         pred.append(out.data[0].cpu().tolist())
         actual.append(GO_annotiations.data[0].cpu().tolist())
-       # print(f"Output shape: {out.shape}, Target shape: {GO_annotiations.shape}")
+        #print(f"Output shape: {out.shape}, Target shape: {GO_annotiations.shape}")
         loss = loss_function(out, GO_annotiations)
         t_loss += one_loss.item()
         #t_loss += loss.data[0]
@@ -553,7 +555,7 @@ def Seq_train(learningrate, batchsize, train_benchmark, test_benchmark, epochtim
 def Domain_train(learningrate, batchsize, train_benchmark, test_benchmark, epochtime, func='BP'):
     print('{}  domainmodel start'.format(func))
     domain_model = Domain_Module(func).cuda()
-    batch_size = 64 # You can reduce the batch size to a smaller value
+    batch_size = 8 # You can reduce the batch size to a smaller value
     #batch_size = batchsize
     learning_rate = learningrate
     epoch_times = epochtime
@@ -696,12 +698,12 @@ def Domain_train(learningrate, batchsize, train_benchmark, test_benchmark, epoch
 def PPI_train(learningrate, batchsize, train_benchmark, test_benchmark, epochtime, func='BP'):
     print('{}  PPImodel start'.format(func))
     ppi_model = PPI_Module(func).cuda()
-    batch_size = 64 # You can reduce the batch size to a smaller value
+    batch_size = 8 # You can reduce the batch size to a smaller value
     #batch_size = batchsize
     learning_rate = learningrate
     epoch_times = epochtime
     print(ppi_model)
-    print('batch_size_{},learning_rate_{},epoch_times_{}'.format(batch_size, learning_rate, epoch_times))
+    #print('batch_size_{},learning_rate_{},epoch_times_{}'.format(batch_size, learning_rate, epoch_times))
     loss_function = nn.BCEWithLogitsLoss(reduction='mean')
     #loss_function = nn.BCELoss()
     optimizer = optim.Adam(ppi_model.parameters(), lr=learning_rate, weight_decay=0.00001)
@@ -799,7 +801,7 @@ def PPI_train(learningrate, batchsize, train_benchmark, test_benchmark, epochtim
         ppi_test_outs[test_benchmark[batch_idx]] = out.data[0].cpu().tolist()
         pred.append(out.data[0].cpu().tolist())
         actual.append(GO_annotiations.data[0].cpu().tolist())
-        print(f"Output shape: {out.shape}, Target shape: {GO_annotiations.shape}")
+        #print(f"Output shape: {out.shape}, Target shape: {GO_annotiations.shape}")
         loss = loss_function(out, GO_annotiations)
         t_loss += loss.item()
         #t_loss += loss.data[0]
@@ -844,22 +846,46 @@ def PPI_train(learningrate, batchsize, train_benchmark, test_benchmark, epochtim
         out = test_PPImodel(ppiVect)
         ppi_train_outs[train_benchmark[batch_idx]] = out.data[0].cpu().tolist()
     return ppi_train_outs, ppi_test_outs, bestthreshold  # weight_classifier
+def compute_multilabel_confusion_matrix(true_labels, pred_labels):
+    num_labels = len(true_labels[0])
+    confusion_matrices = []
+    for i in range(num_labels):
+        cm = confusion_matrix([label[i] for label in true_labels],
+                              [label[i] for label in pred_labels],
+                              labels=[0, 1])
+        confusion_matrices.append(cm)
+    return confusion_matrices
+# Plot AUC-ROC curve
+def plot_auc_roc_curve(true_labels, pred_probs):
+    num_labels = len(true_labels[0])
+    for i in range(num_labels):
+        fpr, tpr, _ = roc_curve([label[i] for label in true_labels], [prob[i] for prob in pred_probs])
+        roc_auc = auc(fpr, tpr)
+        plt.figure()
+        plt.plot(fpr, tpr, color='darkorange', lw=2, label='ROC curve (area = %0.2f)' % roc_auc)
+        plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
+        plt.xlim([0.0, 1.0])
+        plt.ylim([0.0, 1.05])
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        plt.title('Receiver Operating Characteristic (ROC) Curve')
+        plt.legend(loc="lower right")
+        plt.show()
 
 def Main(train_benchmark, test_benchmark, func='BP'):
-    
     if func == 'BP':
-        seq_train_out, seq_test_out, seq_t = Seq_train(0.00001, 64, train_benchmark, test_benchmark, 100, func)  # 15
-        domain_train_out, domain_test_out, domain_t = Domain_train(0.00001, 64, train_benchmark, test_benchmark, 100,
+        seq_train_out, seq_test_out, seq_t = Seq_train(0.00001, 8, train_benchmark, test_benchmark, 10, func)  # 15
+        domain_train_out, domain_test_out, domain_t = Domain_train(0.00001, 8, train_benchmark, test_benchmark, 10,
                                                                        func)  # 40
     else:
-        seq_train_out, seq_test_out, seq_t = Seq_train(0.00001, 64, train_benchmark, test_benchmark, 100, func)    #15
-        domain_train_out, domain_test_out, domain_t = Domain_train(0.00001, 64, train_benchmark, test_benchmark, 100, func)  #40
-    ppi_train_out, ppi_test_out, ppi_t = PPI_train(0.00001, 64, train_benchmark, test_benchmark, 100, func)   #40
+        seq_train_out, seq_test_out, seq_t = Seq_train(0.00001, 8, train_benchmark, test_benchmark, 10, func)    #15
+        domain_train_out, domain_test_out, domain_t = Domain_train(0.00001, 8, train_benchmark, test_benchmark, 10, func)  #40
+    ppi_train_out, ppi_test_out, ppi_t = PPI_train(0.00001, 8, train_benchmark, test_benchmark, 10, func)   #40
 
     print('{}  Weight_model start'.format(func))
     learning_rate = 0.00001
-    batch_size = 64
-    epoch_times = 100
+    batch_size = 8
+    epoch_times = 10
     weight_model = Weight_classifier(func).cuda()
     print(weight_model)
     print('batch_size_{},learning_rate_{},epoch_times_{}'.format(batch_size, learning_rate, epoch_times))
@@ -895,6 +921,7 @@ def Main(train_benchmark, test_benchmark, func='BP'):
         test_batch_num = 0
         pred = []
         actual = []
+        
         for idx, (weight_features, GO_annotiations) in enumerate(test_data_loader):
             weight_features = Variable(weight_features).cuda()
             GO_annotiations = Variable(GO_annotiations).cuda()
@@ -942,6 +969,8 @@ def Main(train_benchmark, test_benchmark, func='BP'):
     weight_test_outs = {}
     pred = []
     actual = []
+    pred_labels = []
+    true_labels = []
     score_dict = {}
     batch_num = 0
     for batch_idx, (weight_features, GO_annotiations) in enumerate(test_data_loader):
@@ -950,6 +979,8 @@ def Main(train_benchmark, test_benchmark, func='BP'):
         out = test_weight_model(weight_features)
         batch_num += 1
         weight_test_outs[test_benchmark[batch_idx]] = out.data[0].cpu().tolist()
+        pred_labels.extend(torch.round(torch.sigmoid(out)).cpu().tolist())
+        true_labels.extend(GO_annotiations.cpu().tolist())
         pred.append(out.data[0].cpu().tolist())
         actual.append(GO_annotiations.data[0].cpu().tolist())
         loss = loss_function(out, GO_annotiations)
@@ -975,15 +1006,35 @@ def Main(train_benchmark, test_benchmark, func='BP'):
     print('test_loss:{},lr:{},batch:{},epoch{},f_max:{}\nauc_score{},recall_max{},prec_max{},threshold:{}'.format(
         test_loss, learning_rate, batch_size, epoch_times,
         f_max, auc_score, recall_max, prec_max, bestthreshold))
-
-    plt.plot(range(epoch_times), train_losses, label='Train Loss')
-    plt.plot(range(epoch_times), val_losses, label='Validation Loss')
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss')
-    plt.title('Training and Validation Losses')
-    plt.legend(['Train Loss', 'Validation Loss'])  # Set legend labels directly
-    plt.savefig('myepoch64batch.png')  # Save the figure before clearing
-    plt.clf()  # Clear the current figure to start a new one
+    conf_matrices = compute_multilabel_confusion_matrix(true_labels, pred_labels)
+    # Plot confusion matrix
+     # Plot confusion matrix for each label
+    for i, conf_mat in enumerate(conf_matrices):
+        plt.figure(figsize=(8, 6))
+        sns.heatmap(conf_mat, annot=True, fmt='d', cmap="Blues")
+        plt.xlabel('Predicted labels')
+        plt.ylabel('True labels')
+        plt.title(f'Confusion Matrix for Label {i}')
+        plt.savefig('confusion_matrix.png')
+        plt.clf()
+        plt.show()
+    # Save confusion matrix plot
+    #plt.savefig('confusion_matrix.png')
+    # Plot AUC-ROC curve
+    fpr, tpr, _ = roc_curve(np.array(true_labels).flatten(), np.array(pred).flatten())
+    roc_auc = auc(fpr, tpr)
+    plt.figure()
+    lw = 2
+    plt.plot(fpr, tpr, color='darkorange', lw=lw, label='ROC curve (area = %0.2f)' % roc_auc)
+    plt.plot([0, 1], [0, 1], color='navy', lw=lw, linestyle='--')
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('Receiver Operating Characteristic')
+    plt.legend(loc="lower right")
+    plt.savefig('ROC.png')
+    plt.clf()
     plt.show()
     
     return each_best_scores
